@@ -1,6 +1,16 @@
-'use strict';
+import { ESLintUtils, TSESTree } from '@typescript-eslint/experimental-utils';
+import { getDocsUrl } from '../utils';
+import {
+  isVariableDeclarator,
+  hasThenProperty,
+  isCallExpression,
+  isIdentifier,
+  isMemberExpression,
+} from '../node-utils';
 
-const { getDocsUrl } = require('../utils');
+export const RULE_NAME = 'await-async-query';
+export type MessageIds = 'awaitAsyncQuery';
+type Options = [];
 
 const VALID_PARENTS = [
   'AwaitExpression',
@@ -10,14 +20,14 @@ const VALID_PARENTS = [
 
 const ASYNC_QUERIES_REGEXP = /^find(All)?By(LabelText|PlaceholderText|Text|AltText|Title|DisplayValue|Role|TestId)$/;
 
-module.exports = {
+export default ESLintUtils.RuleCreator(getDocsUrl)<Options, MessageIds>({
+  name: RULE_NAME,
   meta: {
     type: 'problem',
     docs: {
       description: 'Enforce async queries to have proper `await`',
       category: 'Best Practices',
-      recommended: true,
-      url: getDocsUrl('await-async-query'),
+      recommended: 'warn',
     },
     messages: {
       awaitAsyncQuery: '`{{ name }}` must have `await` operator',
@@ -25,11 +35,14 @@ module.exports = {
     fixable: null,
     schema: [],
   },
+  defaultOptions: [],
 
-  create: function(context) {
-    const testingLibraryQueryUsage = [];
+  create(context) {
+    const testingLibraryQueryUsage: TSESTree.Identifier[] = [];
     return {
-      [`CallExpression > Identifier[name=${ASYNC_QUERIES_REGEXP}]`](node) {
+      [`CallExpression > Identifier[name=${ASYNC_QUERIES_REGEXP}]`](
+        node: TSESTree.Identifier
+      ) {
         if (
           !isAwaited(node.parent.parent) &&
           !isPromiseResolved(node) &&
@@ -43,7 +56,7 @@ module.exports = {
           const variableDeclaratorParent = node.parent.parent;
 
           const references =
-            (variableDeclaratorParent.type === 'VariableDeclarator' &&
+            (isVariableDeclarator(variableDeclaratorParent) &&
               context
                 .getDeclaredVariables(variableDeclaratorParent)[0]
                 .references.slice(1)) ||
@@ -85,36 +98,38 @@ module.exports = {
       },
     };
   },
-};
+});
 
-function isAwaited(node) {
+function isAwaited(node: TSESTree.Node) {
   return VALID_PARENTS.includes(node.type);
 }
 
-function isPromiseResolved(node) {
+function isPromiseResolved(node: TSESTree.Node) {
   const parent = node.parent;
 
-  const hasAThenProperty = node =>
-    node.type === 'MemberExpression' && node.property.name === 'then';
-
   // findByText("foo").then(...)
-  if (parent.type === 'CallExpression') {
-    return hasAThenProperty(parent.parent);
+  if (isCallExpression(parent)) {
+    return hasThenProperty(parent.parent);
   }
 
   // promise.then(...)
-  return hasAThenProperty(parent);
+  return hasThenProperty(parent);
 }
 
-function hasClosestExpectResolvesRejects(node) {
+function hasClosestExpectResolvesRejects(node: TSESTree.Node): boolean {
   if (!node.parent) {
-    return;
+    return false;
   }
 
-  if (node.type === 'CallExpression' && node.callee.name === 'expect') {
+  if (
+    isCallExpression(node) &&
+    isIdentifier(node.callee) &&
+    isMemberExpression(node.parent) &&
+    node.callee.name === 'expect'
+  ) {
     const expectMatcher = node.parent.property;
     return (
-      expectMatcher &&
+      isIdentifier(expectMatcher) &&
       (expectMatcher.name === 'resolves' || expectMatcher.name === 'rejects')
     );
   } else {

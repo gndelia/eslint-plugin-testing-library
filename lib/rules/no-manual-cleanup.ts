@@ -1,8 +1,24 @@
-'use strict';
+import { ESLintUtils, TSESTree } from '@typescript-eslint/experimental-utils';
+import { getDocsUrl } from '../utils';
+import {
+  isLiteral,
+  isImportDefaultSpecifier,
+  isCallExpression,
+  isIdentifier,
+  isObjectPattern,
+  isProperty,
+  isMemberExpression,
+  isImportSpecifier,
+} from '../node-utils';
+
+export const RULE_NAME = 'no-manual-cleanup';
+export type MessageIds = 'noManualCleanup';
+type Options = [];
 
 const CLEANUP_LIBRARY_REGEX = /(@testing-library\/(preact|react|svelte|vue))|@marko\/testing-library/;
 
-module.exports = {
+export default ESLintUtils.RuleCreator(getDocsUrl)<Options, MessageIds>({
+  name: RULE_NAME,
   meta: {
     type: 'problem',
     docs: {
@@ -17,13 +33,39 @@ module.exports = {
     fixable: null,
     schema: [],
   },
+  defaultOptions: [],
 
-  create: function(context) {
-    let defaultImportFromTestingLibrary;
-    let defaultRequireFromTestingLibrary;
+  create(context) {
+    let defaultImportFromTestingLibrary: TSESTree.ImportDeclaration;
+    let defaultRequireFromTestingLibrary:
+      | TSESTree.Identifier
+      | TSESTree.ArrayPattern;
+
+    // can't find the right type?
+    function reportImportReferences(references: any[]) {
+      if (references && references.length > 0) {
+        references.forEach(reference => {
+          const utilsUsage = reference.identifier.parent;
+          if (
+            isMemberExpression(utilsUsage) &&
+            isIdentifier(utilsUsage.property) &&
+            utilsUsage.property.name === 'cleanup'
+          ) {
+            context.report({
+              node: utilsUsage.property,
+              messageId: 'noManualCleanup',
+            });
+          }
+        });
+      }
+    }
 
     return {
       ImportDeclaration(node) {
+        if (!isLiteral(node.source) || typeof node.source.value !== 'string') {
+          return;
+        }
+
         const testingLibraryWithCleanup = node.source.value.match(
           CLEANUP_LIBRARY_REGEX
         );
@@ -33,13 +75,15 @@ module.exports = {
           return;
         }
 
-        if (node.specifiers[0].type === 'ImportDefaultSpecifier') {
+        if (isImportDefaultSpecifier(node.specifiers[0])) {
           defaultImportFromTestingLibrary = node;
         }
 
         const cleanupSpecifier = node.specifiers.find(
           specifier =>
-            specifier.imported && specifier.imported.name === 'cleanup'
+            isImportSpecifier(specifier) &&
+            specifier.imported &&
+            specifier.imported.name === 'cleanup'
         );
 
         if (cleanupSpecifier) {
@@ -51,11 +95,17 @@ module.exports = {
       },
       VariableDeclarator(node) {
         if (
-          node.init &&
-          node.init.callee &&
+          isCallExpression(node.init) &&
+          isIdentifier(node.init.callee) &&
           node.init.callee.name === 'require'
         ) {
-          const requiredModule = node.init.arguments[0];
+          const [requiredModule] = node.init.arguments;
+          if (
+            !isLiteral(requiredModule) ||
+            typeof requiredModule.value !== 'string'
+          ) {
+            return;
+          }
           const testingLibraryWithCleanup = requiredModule.value.match(
             CLEANUP_LIBRARY_REGEX
           );
@@ -65,9 +115,12 @@ module.exports = {
             return;
           }
 
-          if (node.id.type === 'ObjectPattern') {
+          if (isObjectPattern(node.id)) {
             const cleanupProperty = node.id.properties.find(
-              property => property.key.name === 'cleanup'
+              property =>
+                isProperty(property) &&
+                isIdentifier(property.key) &&
+                property.key.name === 'cleanup'
             );
             if (cleanupProperty) {
               context.report({
@@ -86,7 +139,7 @@ module.exports = {
             defaultImportFromTestingLibrary
           )[0].references;
 
-          reportImportReferences(context, references);
+          reportImportReferences(references);
         }
 
         if (defaultRequireFromTestingLibrary) {
@@ -94,27 +147,9 @@ module.exports = {
             .getDeclaredVariables(defaultRequireFromTestingLibrary.parent)[0]
             .references.slice(1);
 
-          reportImportReferences(context, references);
+          reportImportReferences(references);
         }
       },
     };
   },
-};
-
-function reportImportReferences(context, references) {
-  if (references && references.length > 0) {
-    references.forEach(reference => {
-      const utilsUsage = reference.identifier.parent;
-      if (
-        utilsUsage &&
-        utilsUsage.property &&
-        utilsUsage.property.name === 'cleanup'
-      ) {
-        context.report({
-          node: utilsUsage.property,
-          messageId: 'noManualCleanup',
-        });
-      }
-    });
-  }
-}
+});
