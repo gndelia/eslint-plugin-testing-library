@@ -11,7 +11,6 @@ export const RULE_NAME = 'prefer-find-by';
 
 type Options = [];
 export type MessageIds = 'preferFindBy';
-
 export const WAIT_METHODS = ['waitFor', 'waitForElement', 'wait']
 
 export default ESLintUtils.RuleCreator(getDocsUrl)<Options, MessageIds>({
