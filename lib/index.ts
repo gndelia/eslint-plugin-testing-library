@@ -11,6 +11,7 @@ import preferExplicitAssert from './rules/prefer-explicit-assert';
 import preferPresenceQueries from './rules/prefer-presence-queries';
 import preferScreenQueries from './rules/prefer-screen-queries';
 import preferWaitFor from './rules/prefer-wait-for';
+import preferFindBy from './rules/prefer-find-by';
 
 const rules = {
   'await-async-query': awaitAsyncQuery,
@@ -23,6 +24,7 @@ const rules = {
   'no-manual-cleanup': noManualCleanup,
   'no-wait-for-empty-callback': noWaitForEmptyCallback,
   'prefer-explicit-assert': preferExplicitAssert,
+  'prefer-find-by': preferFindBy,
   'prefer-presence-queries': preferPresenceQueries,
   'prefer-screen-queries': preferScreenQueries,
   'prefer-wait-for': preferWaitFor,
