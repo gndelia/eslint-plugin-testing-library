@@ -1,4 +1,4 @@
-# Use `find*` query methods to wait for elements instead of waitFor (prefer-find-by)
+# Suggest using `findBy*` methods instead of the `waitFor` + `getBy` queries (prefer-find-by)
 
 findBy* queries are a simple combination of getBy* queries and waitFor. The findBy\* queries accept the waitFor options as the last argument. (i.e. screen.findByText('text', queryOptions, waitForOptions))
 

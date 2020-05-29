@@ -67,7 +67,11 @@ ruleTester.run(RULE_NAME, rule, {
               queryVariant: queryMethod.includes('All') ? 'findAllBy': 'findBy',
               queryMethod: queryMethod.split('By')[1],
               fullQuery: `${waitMethod}(() => ${queryMethod}('foo', { name: 'baz' }))`,
-            }
+            },
+            suggestions: [{
+              messageId: 'preferFindBy',
+              output: `const submitButton = await ${queryMethod.includes('All') ? 'findAllBy': 'findBy'}${queryMethod.split('By')[1]}('foo', { name: 'baz' })`
+            }]
           }]
         }))
       ).concat(
@@ -81,7 +85,11 @@ ruleTester.run(RULE_NAME, rule, {
               queryVariant: queryMethod.includes('All') ? 'findAllBy': 'findBy',
               queryMethod: queryMethod.split('By')[1],
               fullQuery: `${waitMethod}(() => screen.${queryMethod}('foo', { name: 'baz' }))`,
-            }
+            },
+            suggestions: [{
+              messageId: 'preferFindBy',
+              output: `const submitButton = await screen.${queryMethod.includes('All') ? 'findAllBy': 'findBy'}${queryMethod.split('By')[1]}('foo', { name: 'baz' })`
+            }]
           }]
         }))
       ),

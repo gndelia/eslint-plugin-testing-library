@@ -6,6 +6,7 @@ import {
   isArrowFunctionExpression,
 } from '../node-utils';
 import { getDocsUrl, SYNC_QUERIES_COMBINATIONS } from '../utils';
+import { ReportFixFunction } from '@typescript-eslint/experimental-utils/dist/ts-eslint';
 
 export const RULE_NAME = 'prefer-find-by';
 
@@ -32,11 +33,12 @@ export default ESLintUtils.RuleCreator(getDocsUrl)<Options, MessageIds>({
 
   create(context) {
 
-    function reportInvalidUsage(node: TSESTree.CallExpression, { queryVariant, queryMethod, fullQuery }: { queryVariant: string, queryMethod: string, fullQuery: string}) {
+    function reportInvalidUsage(node: TSESTree.CallExpression, { queryVariant, queryMethod, fullQuery, fix }: { queryVariant: string, queryMethod: string, fullQuery: string, fix: ReportFixFunction }) {
       context.report({
         node,
-        messageId: "preferFindBy",
+        messageId: 'preferFindBy',
         data: { queryVariant, queryMethod, fullQuery },
+        suggest: [{ messageId: "preferFindBy", fix }]
       });
     }
 
@@ -59,21 +61,36 @@ export default ESLintUtils.RuleCreator(getDocsUrl)<Options, MessageIds>({
         // ensure here it's one of the sync methods that we are calling
         if (isMemberExpression(argument.body.callee) && isIdentifier(argument.body.callee.property) && isIdentifier(argument.body.callee.object) && SYNC_QUERIES_COMBINATIONS.includes(argument.body.callee.property.name)) {
           // shape of () => screen.getByText
-          const queryMethod = argument.body.callee.property.name
+          const methodCall = argument.body.callee.property.name
+          const caller = argument.body.callee.object.name
+          const allArguments = argument.body.arguments
+          const queryVariant = getFindByQueryVariant(methodCall)
+          const queryMethod = methodCall.split('By')[1]
           reportInvalidUsage(node, {
-            queryMethod: queryMethod.split('By')[1],
-            queryVariant: getFindByQueryVariant(queryMethod),
-            fullQuery: sourceCode.getText(node)
+            queryMethod,
+            queryVariant,
+            fullQuery: sourceCode.getText(node),
+            fix: (fixer) => {
+              return fixer
+                .replaceText(node, `${caller}.${queryVariant}${queryMethod}(${allArguments.map((param) => sourceCode.getText(param)).join(', ')})`)
+            }
           })
           return
         }
         if (isIdentifier(argument.body.callee) && SYNC_QUERIES_COMBINATIONS.includes(argument.body.callee.name)) {
           // shape of () => getByText
-          const queryMethod = argument.body.callee.name
+          const methodCall = argument.body.callee.name
+          const allArguments = argument.body.arguments
+          const queryVariant = getFindByQueryVariant(methodCall)
+          const queryMethod = methodCall.split('By')[1]
           reportInvalidUsage(node, {
-            queryMethod: queryMethod.split('By')[1],
-            queryVariant: getFindByQueryVariant(queryMethod),
-            fullQuery: sourceCode.getText(node)
+            queryMethod,
+            queryVariant,
+            fullQuery: sourceCode.getText(node),
+            fix: (fixer) => {
+              return fixer
+                .replaceText(node, `${queryVariant}${queryMethod}(${allArguments.map((param) => sourceCode.getText(param)).join(', ')})`)
+            }
           })
           return
         }
